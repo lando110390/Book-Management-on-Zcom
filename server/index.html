@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Book Management</title>
+    <meta name="description" content="Demo contract with zcom blockchain">
+    <link href="./public/css/bootstrap.min.css" rel="stylesheet">
+    <link href="./public/css/style.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="container-fluid">
+        <div class="row" id="inputWrap">
+            <div class="col-md-12">
+                <h3>Add/Edit Book</h3>
+
+                <form role="form" id="input-form">
+                    <div class="form-group">
+                        <label for="bookTitle">Title</label>
+                        <input type="text" class="form-control" id="bookTitle">
+                    </div>
+                    <div class="form-group">
+                        <label for="bookImg">Image</label>
+                        <input type="file" id="bookImg">
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="btnAdd">Add</button>
+                    <button type="submit" class="btn btn-primary" id="btnUpdate">Save</button>
+                    <button type="submit" class="btn btn-danger" id="btnCancel">Cancel</button>
+                </form>
+            </div>
+
+        </div>
+
+        <div class="row" id="listWrap">
+            <div class="col-md-12">
+                <h3>List</h3>
+
+                <div class="row item-wrap sample" style="display: none">
+                    <div><strong class="title">This is a title</strong></div>
+                    <div><img alt="Bootstrap Image Preview" src="" class="img-thumbnail"></div>
+                    <button type="button" class="btn btn-primary btn-xs btn-edit">Edit</button>
+                    <button type="button" class="btn btn-danger btn-xs btn-delete">Remove</button>
+                    <input type="hidden" value="" name="bookId" class="bookId">
+                </div>
+
+                <div id="bookList"></div>
+
+            </div>
+        </div>
+    </div>
+    <div class="loading">Loading&#8230;</div>
+
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.12.1/jquery.min.js"></script>
+    <script src="./public/js/bootstrap.min.js"></script>
+    <script src="./public/js/eth-client.js"></script>
+    <script src="./abi.js"></script>
+    <script src="./public/js/local-storage.js"></script>
+    <script src="./public/js/demo-util.js"></script>
+
+    <script>
+        const cnsAddress = '0xca649d5182cb10c3b5e7d8cee14770ccf6df7396';
+        const baseUrl = 'https://api.blockchain.z.com/';
+        const abi = BOOK_ABI;
+        var password = '123456';
+        var account;
+        var contract;
+        var registerBookId;
+
+        function init() {
+            $('#btnUpdate').hide();
+            $('#btnCancel').hide();
+            var userAccount = LOCAL_STORAGE.getAccount();
+            if (userAccount) {
+                contract = new ethClient.AltExecCnsContract(userAccount, cnsAddress);
+                getAllBooks();
+            } else {
+                ethClient.Account.create(baseUrl, password, function(err, _account) {
+                    if (err) console.log(err);
+                    else {
+                        account = _account;
+                        LOCAL_STORAGE.setAccount(_account);
+                        contract = new ethClient.AltExecCnsContract(account, cnsAddress);
+                    }
+                })
+            }
+        }
+
+        function setBookId(_bookId) {
+            return new Promise(function(resolve, reject) {
+                return contract.sendTransaction(password, 'BookContract', 'setBookId', [_bookId], abi, function(err, res) {
+                    if (err) reject(err);
+                    else resolve(res);
+                });
+            })
+        }
+
+        function setTitleData(_bookId) {
+            const registerdObjectId = DEMO_UTIL.createRandomId(32);
+            let registerdData = $('#bookTitle').val();
+
+            return new Promise(function(resolve, reject) {
+                return contract.sendData(password, 'BookContract', 'setTitleData', registerdObjectId, registerdData, [_bookId], abi, function(err, res) {
+                    if (err) reject(err);
+                    else resolve(res);
+                });
+            });
+        }
+
+        function updateTitleData(_dataObjectId) {
+            let registerdData = $('#bookTitle').val();
+
+            return new Promise(function(resolve, reject) {
+                return contract.sendData(password, 'BookContract', 'updateTitleData', _dataObjectId, registerdData, [], abi, function(err, res) {
+                    if (err) reject(err);
+                    else resolve(res);
+                });
+            });
+        }
+
+        function setImgFile(_bookId) {
+            const registerdObjectId = DEMO_UTIL.createRandomId(32);
+            const fileName = $('input[type=file]').val().split('\\').pop();
+            let input = document.getElementById('bookImg');
+
+            return new Promise(function(resolve, reject) {
+                return contract.sendFile(password, 'BookContract', 'setImgFile', registerdObjectId, fileName, input.files[0], [_bookId], abi, function(err, res) {
+                    if (err) reject(err);
+                    else resolve(res);
+                });
+            })
+        }
+
+        function updateImgFile(_fileObjectId) {
+            let input = document.getElementById('bookImg');
+
+            return new Promise(function(resolve, reject) {
+                return contract.sendData(password, 'BookContract', 'updateImgFile', _fileObjectId, input.files[0], [], abi, function(err, res) {
+                    if (err) reject(err);
+                    else resolve(res);
+                });
+            });
+        }
+
+        function getTitleData(_dataObjectId) {
+            return new Promise(function(resolve, reject) {
+                return contract.getData(password, 'BookContract', 'getTitleData', [_dataObjectId], abi, function(err, res) {
+                    if (err) reject(err);
+                    else resolve(res[0]);
+                });
+            });
+        }
+
+        function getImgFile(_fileObjectId) {
+            return new Promise(function(resolve, reject) {
+                return contract.getFile(password, 'BookContract', 'getImgFile', [_fileObjectId], abi, function(err, res) {
+                    if (err) reject(err);
+                    else resolve(res);
+                });
+            });
+        }
+
+        function getBookWithID(_bookId) {
+            return new Promise(function(resolve, reject) {
+                return contract.call(password, 'BookContract', 'getBookWithID', [_bookId], abi, function(err, res) {
+                    if (err) reject(err);
+                    else resolve(res);
+                });
+            })
+        }
+
+        function getIdBookList() {
+            return new Promise(function(resolve, reject) {
+                return contract.call(password, 'BookContract', 'getIdBookList', [], abi, function(err, res) {
+                    if (err) reject(err);
+                    else resolve(res[0]);
+                });
+            })
+        }
+
+        function addNewBook() {
+            registerBookId = DEMO_UTIL.createRandomId(32);
+            return Promise.all([setBookId(registerBookId), setTitleData(registerBookId), setImgFile(registerBookId)])
+                .then(function([txHashId, txHashData, txHashImg]) {
+                    setTimeout(function() {
+                        getAllBooks().then(() => {
+                            $('#bookTitle').val('');
+                            $('#bookImg').val('');
+                            $('#btnAdd').removeClass('disabled');
+                            $('.loading').hide();
+                        })
+                    }, 5000);
+                });
+        }
+
+        var currentBookSelected;
+        function editTheBook(book, row) {
+            $('#bookTitle').val(row.find('.title').text());
+            $('#btnAdd').hide();
+            $('#btnUpdate').show();
+            $('#btnCancel').show();
+            currentBookSelected = book;
+        }
+
+        function updateTheBook() {
+            updateTitleData(currentBookSelected[1]).then(function(res) {
+                console.log('update title ok: ', res);
+                if (document.getElementById("bookImg").files.length > 0) {
+                    updateImgFile(currentBookSelected[2]).then(function(res) {
+                        console.log('update image ok: ', res);
+                    })
+                }
+            })
+        }
+
+        function appendBook(_bookId) {
+            return getBookWithID(_bookId).then(function(book) {
+                let dataObjectId = book[1],
+                    fileObjectId = book[2];
+                return getTitleData(dataObjectId).then(function(objTitle) {
+                    if (objTitle.status == 200) {
+                        var title = objTitle.data;
+                        return getImgFile(fileObjectId).then(function(objImg) {
+                            var row = $("[class*='sample']").clone();
+                            row.removeClass('sample');
+                            row.find('.title').text(title);
+                            row.find('.img-thumbnail').attr('src', window.URL.createObjectURL(objImg));
+                            row.find('.btn-edit').click(function(e) {
+                                editTheBook(book, row);
+                            });
+                            row.find('.btn-delete').click(function(e) {
+                                alert('この関数が開発られています。');
+                            });
+                            row.find('.bookId').val(_bookId);
+                            row.show();
+
+                            row.prependTo('#bookList');
+                        })
+                    }
+                })
+            });
+        }
+
+        function getAllBooks() {
+            $('.loading').show();
+            return getIdBookList().then(function(bookList) {
+                $('#bookList').html('');
+
+                let fetchBookIds = function(_bookList) {
+                    return _bookList.reduce(function(promise, bookId) {
+                        return promise.then((result) => {
+                            return appendBook(bookId)
+                        });
+                    }, Promise.resolve());
+                }
+
+                return fetchBookIds(bookList).then(() => {
+                    $('.loading').hide();
+                });
+            });
+        }
+
+        $('#btnAdd').click(function(e) {
+            if ($(this).hasClass('disabled')) return false;
+            e.preventDefault();
+            if (!$('#bookTitle').val()) { alert('Input Book Title'); return false; }
+            if (!$('#bookImg').val()) { alert('Input Book Image'); return false; }
+            $(this).addClass('disabled');
+            $('.loading').show();
+            addNewBook();
+        });
+
+        $('#btnUpdate').click(function(e) {
+            e.preventDefault();
+            if (!$('#bookTitle').val()) { alert('Input Book Title'); return false; }
+            $(this).addClass('disabled');
+            $('.loading').show();
+            updateTheBook();
+        });
+
+        $('#btnCancel').click(function(e) {
+            e.preventDefault();
+            $(this).hide();
+            $('#btnUpdate').hide();
+            $('#btnAdd').show();
+            $('#bookTitle').val('');
+            $('#bookImg').val('')
+        });
+
+        init();
+    </script>
+</body>
+
+</html>
