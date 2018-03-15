@@ -69,7 +69,7 @@ contract BookContract_v1 is VersionContract, BookContract  {
         return _objectId;
     }
 
-    function updateData(bytes _sign, bytes32 _objectId, bytes32 _hash, bytes32 _bookId) {
+    function updateTitleData(bytes _sign, bytes32 _objectId, bytes32 _hash, bytes32 _bookId) {
         bytes32 hash = calcEnvHash('updateTitleData');
         hash = sha3(hash, _objectId);
         hash = sha3(hash, _hash);
@@ -104,7 +104,7 @@ contract BookContract_v1 is VersionContract, BookContract  {
         return logic_v1.getImgFile(bytes32(_objectId));
     }
 
-    function updateImgFile(bytes _sign, bytes32 _objectId, bytes32 _fileHash) {
+    function updateImgFile(bytes _sign, bytes32 _objectId, bytes32 _fileHash, bytes32 _bookId) {
         bytes32 hash = calcEnvHash('updateImgFile');
         hash = sha3(hash, _objectId);
         hash = sha3(hash, _fileHash);
