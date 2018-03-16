@@ -62,25 +62,15 @@
 	<script src="./public/js/web3.js"></script>
 
     <script>
-		const MAX_COUNTDOWN = 5;
-        const cnsAddress = '0x99ce35d31aed121de342aa05b4934825a0e51a21';
-        const baseUrl = 'https://api.blockchain.z.com/';
-        const abi = BOOK_ABI;
-        var password = '123456';
-        var account;
-        var contract;
-        var registerBookId;
+		const 	MAX_COUNTDOWN 	= 5,
+				cnsAddress 		= '0x99ce35d31aed121de342aa05b4934825a0e51a21',
+				baseUrl 		= 'https://api.blockchain.z.com/',
+				abi 			= BOOK_ABI,
+				password 		= '123456';
+				
 		var web3 = new Web3();
+        var account, contract, registerBookId, currentBookSelected, rowBookSelected;
 
-//registerBookId:  0jAxwoHWzgY107VRCmGXm2s25fusTs23
-//registerdObjectId:  Xn0nYcyo1vMcUvbdAM3XFyt9OOGtK0iK
-//fileName:  1.txt
-//--------------- sendFile - start 
-// *** ERR ***  null
-// *** res ***  0x144b7d7bf8505eb679e491c8ae2278d399184725aa3570d0993ad065cc62cc30		
-		
-		
-		
         function init() {
             $('#btnUpdate').hide();
             $('#btnCancel').hide();
@@ -88,57 +78,6 @@
             if (userAccount) {
                 contract = new ethClient.AltExecCnsContract(userAccount, cnsAddress);
                 getAllBooks();
-				$('#loading').hide();
-				
-				/*contract.getFile(password, 'BookContract', 'getImgFile', ['dOPQaOYIpzawD3vheFCYD7GScSTEiLsg'], abi, function(err, res) {
-					console.log('*** ERR *** ', err);
-					console.log('*** res *** ', res);
-					var link = document.createElement("a");
-					document.body.appendChild(link);
-					link.href = window.URL.createObjectURL(res);
-					link.download = res.name;
-					link.click();
-					window.URL.revokeObjectUrl(link.href);
-					document.body.removeChild(link);
-				});*/
-				
-				/*setTimeout(function() {
-					console.log('--------------- updateFile - start ');
-					let input = document.getElementById('bookImg');
-					contract.updateFile(password, 'BookContract', 'updateImgFile', 'dOPQaOYIpzawD3vheFCYD7GScSTEiLsg', input.files[0], ['ZrSFn92KeAwNQO4Ftkmkj8XuZtH8I13u'], abi, function(err, res) {
-						console.log('*** ERR *** ', err);
-						console.log('*** res *** ', res);
-					});
-					
-					registerBookId = DEMO_UTIL.createRandomId(32);
-					const registerdObjectId = DEMO_UTIL.createRandomId(32);
-					const fileName = $('input[type=file]').val().split('\\').pop();
-					let input = document.getElementById('bookImg');
-					
-					console.log('registerBookId: ', registerBookId);
-					console.log('registerdObjectId: ', registerdObjectId);
-					console.log('fileName: ', fileName);
-					console.log('--------------- sendFile - start ');
-					contract.sendFile(password, 'BookContract', 'setImgFile', registerdObjectId, fileName, input.files[0], [registerBookId], abi, function(err, res) {
-						console.log('*** ERR *** ', err);
-						console.log('*** res *** ', res);
-						
-					});
-				}, 10000)*/
-				
-				
-				
-				
-				
-				//contract.updateData(password, 'BookContract', 'updateTitleData', '2ViEUh1Tzo9p5TVwy2MKBqHp454EKA02', 'ppppppppppppp', ['v6wsEwsDOhCLxd77odFj57pK5oHPMOmw'], abi, function(err, txHash) {
-				//	console.log('-------------- updateData');
-				//	if (err) console.error(err);
-				//	else console.log(txHash);
-				//});
-				//_bookId 0x553074474e7775416e444556584f47364e73524f614f48517171496551435644
-				//dataObjectId 0x3637794c5a4f4830363947687167664c4b3668424c5150367848346173577246
-				//fileObjectId 0x70504d515744676164553669354d6b4c7070636479336f54555a4d5231664737
-				
             } else {
                 ethClient.Account.create(baseUrl, password, function(err, _account) {
                     if (err) console.log(err);
@@ -165,6 +104,9 @@
             });
 		}
 
+		/******************************************************
+		||						BOOK						||
+		*/
         function setBookId(_bookId) {
             return new Promise(function(resolve, reject) {
                 return contract.sendTransaction(password, 'BookContract', 'setBookId', [_bookId], abi, function(err, res) {
@@ -174,6 +116,118 @@
             })
         }
 
+		function getBookWithID(_bookId) {
+            return new Promise(function(resolve, reject) {
+                return contract.call(password, 'BookContract', 'getBookWithID', [_bookId], abi, function(err, res) {
+                    if (err) reject(err);
+                    else resolve(res);
+                });
+            })
+        }
+		
+		function getIdBookList() {
+            return new Promise(function(resolve, reject) {
+                return contract.call(password, 'BookContract', 'getIdBookList', [], abi, function(err, res) {
+                    if (err) reject(err);
+                    else resolve(res[0]);
+                });
+            })
+        }
+		
+		function addNewBook() {
+			$('.loading').text('Adding Book ...').show();
+            registerBookId = DEMO_UTIL.createRandomId(32);
+            return Promise.all([setBookId(registerBookId), setTitleData(registerBookId), setImgFile(registerBookId)])
+                .then(function([txHashId, txHashData, txHashImg]) {
+					return Promise.all([getTransactionReceiptLoop(txHashData), getTransactionReceiptLoop(txHashImg)]).then(([receiptData, receiptImg]) => {
+						$('.loading').text('Success !!! Waiting for load new book ...')
+						setTimeout(function() {
+							appendBook(registerBookId).then(() => {
+								$('.loading').hide();
+								activeAddFunction();
+							});
+						}, 5000);
+					})
+					
+                })
+        }
+		
+		function updateTheBook() {
+			$('.loading').text('Updating the book ...').show();
+			let _appendBook = function() {
+				$('.loading').text('Loading book again ...')
+				rowBookSelected.remove();
+				appendBook(currentBookSelected[0]).then(() => {
+					rowBookSelected.remove();
+					$('.loading').hide();
+					activeAddFunction();
+				});
+			}
+            updateTitleData(web3.toAscii(currentBookSelected[1]), currentBookSelected[0]).then(function(txHashData) {
+                if (document.getElementById("bookImg").files.length > 0) {
+                    updateImgFile(web3.toAscii(currentBookSelected[2]), currentBookSelected[0]).then(function(txHashFile) {
+                        Promise.all([getTransactionReceiptLoop(txHashData), getTransactionReceiptLoop(txHashFile)]).then(([receiptData, receiptImg]) => {
+							setTimeout(function() { _appendBook(); }, 5000);
+						})
+                    })
+                } else {
+					Promise.all([getTransactionReceiptLoop(txHashData)]).then(([receiptData]) => {
+						setTimeout(function() { _appendBook(); }, 5000);
+					})
+				}
+            })
+        }
+		
+		function appendBook(_bookId) {
+			return new Promise(function(resolve, reject) {
+                return getBookWithID(_bookId).then(function(book) {
+					let dataObjectId = web3.toAscii(book[1]),
+						fileObjectId = web3.toAscii(book[2]);
+					return getTitleData(dataObjectId).then(function(objTitle) {
+						if (objTitle.status == 200) {
+							var title = objTitle.data;
+							return getImgFile(fileObjectId).then(function(objImg) {
+								var row = $("[class*='sample']").clone();
+								row.removeClass('sample');
+								
+								row.find('.title').text(title);
+								row.find('.img-thumbnail').attr('src', window.URL.createObjectURL(objImg));
+								
+								row.find('.btn-edit').click(function(e) { activeEditFunction(book, row); });
+								row.find('.btn-delete').click(function(e) { alert('この関数が開発られています。'); });
+
+								row.prependTo('#bookList');
+								row.show();
+								resolve();
+							})
+						} else resolve();
+					})
+				});
+            });
+        }
+		
+		function getAllBooks() {
+            $('.loading').text('Loading List ...').show();
+            return getIdBookList().then(function(bookList) {
+                $('#bookList').html('');
+
+                let fetchBookIds = function(_bookList) {
+                    return _bookList.reduce(function(promise, bookId) {
+                        return promise.then((result) => {
+                            return appendBook(bookId)
+                        });
+                    }, Promise.resolve());
+                }
+
+                return fetchBookIds(bookList).then(() => {
+                    $('.loading').hide();
+                });
+            });
+        }
+		
+		/******************************************************
+		||						TITLE						||
+		*/
         function setTitleData(_bookId) {
             const registerdObjectId = DEMO_UTIL.createRandomId(32);
             let registerdData = $('#bookTitle').val();
@@ -185,6 +239,15 @@
             });
         }
 
+		function getTitleData(_dataObjectId) {
+            return new Promise(function(resolve, reject) {
+                return contract.getData(password, 'BookContract', 'getTitleData', [_dataObjectId], abi, function(err, res) {
+                    if (err) reject(err);
+                    else resolve(res[0]);
+                });
+            });
+        }
+		
         function updateTitleData(_dataObjectId, _bookId) {
             let registerdData = $('#bookTitle').val();
             return new Promise(function(resolve, reject) {
@@ -195,6 +258,9 @@
             });
         }
 
+		/******************************************************
+		||						IMAGE						||
+		*/
         function setImgFile(_bookId) {
             const registerdObjectId = DEMO_UTIL.createRandomId(32);
             const fileName = $('input[type=file]').val().split('\\').pop();
@@ -219,15 +285,6 @@
             });
         }
 
-        function getTitleData(_dataObjectId) {
-            return new Promise(function(resolve, reject) {
-                return contract.getData(password, 'BookContract', 'getTitleData', [_dataObjectId], abi, function(err, res) {
-                    if (err) reject(err);
-                    else resolve(res[0]);
-                });
-            });
-        }
-
         function getImgFile(_fileObjectId) {
             return new Promise(function(resolve, reject) {
                 return contract.getFile(password, 'BookContract', 'getImgFile', [_fileObjectId], abi, function(err, res) {
@@ -237,156 +294,58 @@
             });
         }
 
-        function getBookWithID(_bookId) {
-            return new Promise(function(resolve, reject) {
-                return contract.call(password, 'BookContract', 'getBookWithID', [_bookId], abi, function(err, res) {
-                    if (err) reject(err);
-                    else resolve(res);
-                });
-            })
-        }
-
-        function getIdBookList() {
-            return new Promise(function(resolve, reject) {
-                return contract.call(password, 'BookContract', 'getIdBookList', [], abi, function(err, res) {
-                    if (err) reject(err);
-                    else resolve(res[0]);
-                });
-            })
-        }
-
-        function addNewBook() {
-            registerBookId = DEMO_UTIL.createRandomId(32);
-            return Promise.all([setBookId(registerBookId), setTitleData(registerBookId), setImgFile(registerBookId)])
-                .then(function([txHashId, txHashData, txHashImg]) {
-					return Promise.all([getTransactionReceiptLoop(txHashData), getTransactionReceiptLoop(txHashImg)]).then(([receiptData, receiptImg]) => {
-						setTimeout(function() {
-							appendBook(registerBookId).then(() => {
-								$('.loading').hide();
-								$('#btnAdd').removeClass('disabled');
-							});
-						}, 5000);
-					})
-					
-                })
-        }
-
-        var currentBookSelected;
-		var rowBookSelected;
-        function editTheBook(book, row) {
-            $('#bookTitle').val(row.find('.title').text());
-            $('#btnAdd').hide();
-            $('#btnUpdate').show();
-            $('#btnCancel').show();
-            currentBookSelected = book;
+		/******************************************************
+		||						BUTTON						||
+		*/
+		function activeAddFunction() {
+			$('#btnAdd').removeClass('disabled');
+			$('#btnUpdate').removeClass('disabled');
+			$('#btnUpdate').hide();
+			$('#btnCancel').hide();
+			$('#btnAdd').show();
+			$('#bookTitle').val('');
+            $('#bookImg').val('');
+		}
+		
+		function disableAddFunction() {
+			$('#btnAdd').addClass('disabled');
+		}
+		
+		function activeEditFunction(book, row) {
+			$('#btnAdd').removeClass('disabled');
+			$('#btnUpdate').removeClass('disabled');
+			$('#btnAdd').hide();
+			$('#btnUpdate').show();
+			$('#btnCancel').show();
+			$('#bookTitle').val(row.find('.title').text());
+            $('#bookImg').val('');
+			currentBookSelected = book;
             rowBookSelected = row;
-        }
-
-        function updateTheBook() {
-            updateTitleData(web3.toAscii(currentBookSelected[1]), currentBookSelected[0]).then(function(txHashData) {
-                if (document.getElementById("bookImg").files.length > 0) {
-                    updateImgFile(web3.toAscii(currentBookSelected[2]), currentBookSelected[0]).then(function(txHashFile) {
-                        Promise.all([getTransactionReceiptLoop(txHashData), getTransactionReceiptLoop(txHashFile)]).then(([receiptData, receiptImg]) => {
-							setTimeout(function() {
-								rowBookSelected.remove();
-								appendBook(currentBookSelected[0]).then(() => {
-									$('.loading').hide();
-									$('#btnAdd').removeClass('disabled');
-								});
-							}, 5000);
-						})
-                    })
-                } else {
-					Promise.all([getTransactionReceiptLoop(txHashData)]).then(([receiptData]) => {
-						setTimeout(function() {
-							rowBookSelected.remove();
-							appendBook(currentBookSelected[0]).then(() => {
-								rowBookSelected.remove();
-								$('.loading').hide();
-								$('#btnAdd').removeClass('disabled');
-							});
-						}, 5000);
-					})
-				}
-            })
-        }
-
-        function appendBook(_bookId) {
-			return new Promise(function(resolve, reject) {
-                return getBookWithID(_bookId).then(function(book) {
-					let dataObjectId = web3.toAscii(book[1]),
-						fileObjectId = web3.toAscii(book[2]);
-					return getTitleData(dataObjectId).then(function(objTitle) {
-						console.log(objTitle);
-						if (objTitle.status == 200) {
-							var title = objTitle.data;
-							return getImgFile(fileObjectId).then(function(objImg) {
-								var row = $("[class*='sample']").clone();
-								row.removeClass('sample');
-								row.find('.title').text(title);
-								row.find('.img-thumbnail').attr('src', window.URL.createObjectURL(objImg));
-								row.find('.btn-edit').click(function(e) {
-									editTheBook(book, row);
-								});
-								row.find('.btn-delete').click(function(e) {
-									alert('この関数が開発られています。');
-								});
-								row.find('.bookId').val(_bookId);
-								row.show();
-
-								row.prependTo('#bookList');
-								resolve();
-							})
-						} else resolve();
-					})
-				});
-            });
-        }
-
-        function getAllBooks() {
-            $('.loading').show();
-            return getIdBookList().then(function(bookList) {
-                $('#bookList').html('');
-
-                let fetchBookIds = function(_bookList) {
-                    return _bookList.reduce(function(promise, bookId) {
-                        return promise.then((result) => {
-                            return appendBook(bookId)
-                        });
-                    }, Promise.resolve());
-                }
-
-                return fetchBookIds(bookList).then(() => {
-                    $('.loading').hide();
-                });
-            });
-        }
+		}
+		
+		function disableEditFunction() {
+			$('#btnUpdate').addClass('disabled');
+		}
 
         $('#btnAdd').click(function(e) {
             if ($(this).hasClass('disabled')) return false;
             e.preventDefault();
             if (!$('#bookTitle').val()) { alert('Input Book Title'); return false; }
             if (!$('#bookImg').val()) { alert('Input Book Image'); return false; }
-            $(this).addClass('disabled');
-            $('.loading').show();
+            disableAddFunction();
             addNewBook();
         });
 
         $('#btnUpdate').click(function(e) {
             e.preventDefault();
             if (!$('#bookTitle').val()) { alert('Input Book Title'); return false; }
-            $(this).addClass('disabled');
-            $('.loading').show();
+            disableEditFunction();
             updateTheBook();
         });
 
         $('#btnCancel').click(function(e) {
             e.preventDefault();
-            $(this).hide();
-            $('#btnUpdate').hide();
-            $('#btnAdd').show();
-            $('#bookTitle').val('');
-            $('#bookImg').val('');
+            activeAddFunction();
         });
 
         init();
