@@ -63,7 +63,7 @@
 
     <script>
 		const 	MAX_COUNTDOWN 	= 5,
-				cnsAddress 		= '0x99ce35d31aed121de342aa05b4934825a0e51a21',
+				cnsAddress 		= '0xc351949545b5861ce849dbbf498f8679eae9e288',
 				baseUrl 		= 'https://api.blockchain.z.com/',
 				abi 			= BOOK_ABI,
 				password 		= '123456';
@@ -85,6 +85,7 @@
                         account = _account;
                         LOCAL_STORAGE.setAccount(_account);
                         contract = new ethClient.AltExecCnsContract(account, cnsAddress);
+						getAllBooks();
                     }
                 })
             }
@@ -287,7 +288,7 @@
 
         function getImgFile(_fileObjectId) {
             return new Promise(function(resolve, reject) {
-                return contract.getFile(password, 'BookContract', 'getImgFile', [_fileObjectId], abi, function(err, res) {
+                return contract.getFile(password, 'BookContract', 'getImgFile', [_fileObjectId, Date.now()], abi, function(err, res) {
                     if (err) reject(err);
                     else resolve(res);
                 });

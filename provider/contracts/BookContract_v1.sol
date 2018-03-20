@@ -100,7 +100,7 @@ contract BookContract_v1 is VersionContract, BookContract  {
         return Books[_bookId].imgId;
     }
 
-	function getImgFile(bytes32 _objectId) constant returns (bytes32) {
+	function getImgFile(bytes32 _objectId, bytes32 _param) constant returns (bytes32) {
         return logic_v1.getImgFile(bytes32(_objectId));
     }
 
