@@ -14,27 +14,49 @@
     <div class="container-fluid">
         <div class="row" id="inputWrap">
             <div class="col-md-12">
-                <h3>Add/Edit Book</h3>
+                <section id="myFormWrap" style="display: none;">
+                    <h3>Add/Edit Book</h3>
 
-                <form role="form" id="input-form">
+                    <form role="form" id="input-form">
+                        <div class="form-group">
+                            <label for="bookTitle">Title</label>
+                            <input type="text" class="form-control" id="bookTitle">
+                        </div>
+                        <div class="form-group">
+                            <label for="bookImg">Image</label>
+                            <input type="file" id="bookImg">
+                        </div>
+                        <button type="submit" class="btn btn-primary" id="btnAdd">Add</button>
+                        <button type="submit" class="btn btn-primary" id="btnUpdate">Save</button>
+                        <button type="submit" class="btn btn-danger" id="btnCancel">Cancel</button>
+                    </form>
+                </section>
+
+                <section id="ksFormWrap" style="display: none;">
+                    <h3>Create new Account</h3>
                     <div class="form-group">
-                        <label for="bookTitle">Title</label>
-                        <input type="text" class="form-control" id="bookTitle">
+                        <label for="bookImg">Create new Account</label>
+                        <button type="submit" class="btn btn-primary" id="btnCreateAccount">Create</button>
+                        <div class="status" style="display: none"><i>Creating...</i></div>
+                        <div class="warn" style="display: none"><i>
+                            <p class="GEN_Warning_1">**Do not lose it!** It cannot be recovered if you lose it.</p>
+                            <p class="GEN_Warning_2">**Do not share it!**</p></i>
+                            <span>Click to download </span>
+                        </div>
                     </div>
                     <div class="form-group">
-                        <label for="bookImg">Image</label>
-                        <input type="file" id="bookImg">
+                        <label for="bookImg">Login with your keystore</label>
+                        <input type="file" id="yourKeystore">
+                        <button type="submit" class="btn btn-primary" id="btnLogin">Login</button>
                     </div>
-                    <button type="submit" class="btn btn-primary" id="btnAdd">Add</button>
-                    <button type="submit" class="btn btn-primary" id="btnUpdate">Save</button>
-                    <button type="submit" class="btn btn-danger" id="btnCancel">Cancel</button>
-                </form>
+                </section>
             </div>
 
         </div>
 
         <div class="row" id="listWrap">
             <div class="col-md-12">
+                <p style="text-align: right; display: none;" class="login-wrap"><button type="submit" class="btn btn-danger" id="btnLogout">Logout</button></p>
                 <h3>List</h3>
 
                 <div class="row item-wrap sample" style="display: none">
@@ -50,7 +72,9 @@
             </div>
         </div>
     </div>
-    <div class="loading">Loading&#8230;</div>
+    <div class="loading" style="display: none;">Loading&#8230;</div>
+
+
 
     <script src="//ajax.googleapis.com/ajax/libs/jquery/1.12.1/jquery.min.js"></script>
     <script src="./public/js/bootstrap.min.js"></script>
@@ -63,11 +87,14 @@
 
     <script>
 		const 	MAX_COUNTDOWN 	= 5,
+                EXTENSION_IMG   = ['.jpg', '.png', '.gif'],
+                EXTENSION_KS   = ['.json'],
 				cnsAddress 		= '0xc351949545b5861ce849dbbf498f8679eae9e288',
 				baseUrl 		= 'https://api.blockchain.z.com/',
 				abi 			= BOOK_ABI,
-				password 		= '123456';
-				
+                password 		= '123456';
+
+
 		var web3 = new Web3();
         var account, contract, registerBookId, currentBookSelected, rowBookSelected;
 
@@ -76,25 +103,75 @@
             $('#btnCancel').hide();
             var userAccount = LOCAL_STORAGE.getAccount();
             if (userAccount) {
+                $('#myFormWrap').show();
+                $('#ksFormWrap').hide();
+                $('.login-wrap').show();
                 contract = new ethClient.AltExecCnsContract(userAccount, cnsAddress);
                 getAllBooks();
             } else {
-                ethClient.Account.create(baseUrl, password, function(err, _account) {
-                    if (err) console.log(err);
-                    else {
-                        account = _account;
-                        LOCAL_STORAGE.setAccount(_account);
-                        contract = new ethClient.AltExecCnsContract(account, cnsAddress);
-						getAllBooks();
-                    }
-                })
+                $('#myFormWrap').hide();
+                $('#ksFormWrap').show();
             }
         }
-		
+
+        function stripHexPrefix(str) {
+          if (typeof str !== 'string') {
+            return str;
+          }
+
+          return str.slice(2);
+        }
+
+        function createNewAccount() {
+            $('.status').show();
+            $('.warn').find('a').remove();
+            $('.warn').hide();
+            ethClient.Account.create(baseUrl, password, function(err, _account) {
+                if (err) console.log(err);
+                else {
+                    account = _account;
+
+                    $('.status').hide();
+                    $('.warn').show();
+                    var encode = account.serialize();
+                    var element = document.createElement('a');
+                    var filename = "UTC--" + (new Date().toJSON().slice(0,10)) + '--' + stripHexPrefix(account.getAddress());
+                    element.setAttribute('href', 'data:text/json;charset=utf-8,' + encodeURIComponent(encode));
+                    element.setAttribute('download', filename);
+                    element.setAttribute('class', 'download');
+                    element.textContent = 'Keystore File (UTC / JSON)';
+                    $('.warn').append(element);
+                    $('#btnCreateAccount').removeClass('disabled');
+                }
+            })
+        }
+
+        function loginWithYourKeystore() {
+            let input = document.getElementById('yourKeystore');
+            var fReader = new FileReader();
+            fReader.readAsDataURL(input.files[0]);
+            var reader = new FileReader();
+
+    		reader.onload = (function (theFile) {
+    			return function (e) {
+    				try {
+    					serializedAccount = e.target.result;
+                        var _account = ethClient.Account.deserialize(serializedAccount);
+                        account = _account;
+                        LOCAL_STORAGE.setAccount(_account);
+                        window.location.href = "/";
+    				} catch (ex) {
+    					alert('Sorry, keystore file is invalid');
+    				}
+    			}
+    		})(input.files[0]);
+    		reader.readAsText(input.files[0]);
+        }
+
 		function getTransactionReceiptLoop(txHash) {
 			let count = 0;
 			return new Promise(function(resolve, reject) {
-                let setIntervalPoint = setInterval(function(){ 
+                let setIntervalPoint = setInterval(function(){
 					contract.getTransactionReceipt(txHash, function (err, receipt) {
 						if (receipt || count == MAX_COUNTDOWN) {
 							clearInterval(setIntervalPoint);
@@ -125,7 +202,7 @@
                 });
             })
         }
-		
+
 		function getIdBookList() {
             return new Promise(function(resolve, reject) {
                 return contract.call(password, 'BookContract', 'getIdBookList', [], abi, function(err, res) {
@@ -134,7 +211,7 @@
                 });
             })
         }
-		
+
 		function addNewBook() {
 			$('.loading').text('Adding Book ...').show();
             registerBookId = DEMO_UTIL.createRandomId(32);
@@ -149,10 +226,10 @@
 							});
 						}, 5000);
 					})
-					
+
                 })
         }
-		
+
 		function updateTheBook() {
 			$('.loading').text('Updating the book ...').show();
 			let _appendBook = function() {
@@ -178,7 +255,7 @@
 				}
             })
         }
-		
+
 		function appendBook(_bookId) {
 			return new Promise(function(resolve, reject) {
                 return getBookWithID(_bookId).then(function(book) {
@@ -190,10 +267,10 @@
 							return getImgFile(fileObjectId).then(function(objImg) {
 								var row = $("[class*='sample']").clone();
 								row.removeClass('sample');
-								
+
 								row.find('.title').text(title);
 								row.find('.img-thumbnail').attr('src', window.URL.createObjectURL(objImg));
-								
+
 								row.find('.btn-edit').click(function(e) { activeEditFunction(book, row); });
 								row.find('.btn-delete').click(function(e) { alert('この関数が開発られています。'); });
 
@@ -206,7 +283,7 @@
 				});
             });
         }
-		
+
 		function getAllBooks() {
             $('.loading').text('Loading List ...').show();
             return getIdBookList().then(function(bookList) {
@@ -225,7 +302,7 @@
                 });
             });
         }
-		
+
 		/******************************************************
 		||						TITLE						||
 		*/
@@ -248,7 +325,7 @@
                 });
             });
         }
-		
+
         function updateTitleData(_dataObjectId, _bookId) {
             let registerdData = $('#bookTitle').val();
             return new Promise(function(resolve, reject) {
@@ -307,11 +384,11 @@
 			$('#bookTitle').val('');
             $('#bookImg').val('');
 		}
-		
+
 		function disableAddFunction() {
 			$('#btnAdd').addClass('disabled');
 		}
-		
+
 		function activeEditFunction(book, row) {
 			$('#btnAdd').removeClass('disabled');
 			$('#btnUpdate').removeClass('disabled');
@@ -323,16 +400,17 @@
 			currentBookSelected = book;
             rowBookSelected = row;
 		}
-		
+
 		function disableEditFunction() {
 			$('#btnUpdate').addClass('disabled');
 		}
 
         $('#btnAdd').click(function(e) {
-            if ($(this).hasClass('disabled')) return false;
             e.preventDefault();
+            if ($(this).hasClass('disabled')) return false;
             if (!$('#bookTitle').val()) { alert('Input Book Title'); return false; }
             if (!$('#bookImg').val()) { alert('Input Book Image'); return false; }
+            if (!$('#bookImg').hasExtension(EXTENSION_IMG)) { alert("Sorry, file upload is invalid, allowed extensions are: " + EXTENSION_IMG.join(", ")); return false; }
             disableAddFunction();
             addNewBook();
         });
@@ -348,6 +426,29 @@
             e.preventDefault();
             activeAddFunction();
         });
+
+        $('#btnCreateAccount').click(function(e) {
+            e.preventDefault();
+            if ($(this).hasClass('disabled')) return false;
+            $(this).addClass('disabled');
+            createNewAccount();
+        });
+
+        $('#btnLogin').click(function(e) {
+            e.preventDefault();
+            if (!$('#yourKeystore').val()) { alert('Input your keystore file'); return false; }
+            loginWithYourKeystore();
+        });
+
+        $('#btnLogout').click(function(e) {
+            e.preventDefault();
+            LOCAL_STORAGE.removeAccount();
+            window.location.href = "/";
+        });
+
+        $.fn.hasExtension = function(exts) {
+            return (new RegExp('(' + exts.join('|').replace(/\./g, '\\.') + ')$')).test($(this).val());
+        }
 
         init();
     </script>
