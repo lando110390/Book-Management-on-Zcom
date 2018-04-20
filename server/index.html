@@ -35,7 +35,8 @@
                 <section id="ksFormWrap" style="display: none;">
                     <h3>Create new Account</h3>
                     <div class="form-group">
-                        <label for="bookImg">Create new Account</label>
+                        <label for="bookImg">Enter Password</label>
+						<input type="password" id="newPassword">
                         <button type="submit" class="btn btn-primary" id="btnCreateAccount">Create</button>
                         <div class="status" style="display: none"><i>Creating...</i></div>
                         <div class="warn" style="display: none"><i>
@@ -46,6 +47,7 @@
                     </div>
                     <div class="form-group">
                         <label for="bookImg">Login with your keystore</label>
+						<input type="password" id="yourPassword">
                         <input type="file" id="yourKeystore">
                         <button type="submit" class="btn btn-primary" id="btnLogin">Login</button>
                     </div>
@@ -91,8 +93,8 @@
                 EXTENSION_KS   = ['.json'],
 				cnsAddress 		= '0x96de74b8b63b2f896a36c3b1ddc27c32e8a81b49',
 				baseUrl 		= 'https://api.blockchain.z.com/',
-				abi 			= BOOK_ABI,
-                password 		= '123456';
+				abi 			= BOOK_ABI;
+		let password 		= '';
 
 
 		var web3 = new Web3();
@@ -101,12 +103,11 @@
         function init() {
             $('#btnUpdate').hide();
             $('#btnCancel').hide();
-            var userAccount = LOCAL_STORAGE.getAccount();
-            if (userAccount) {
+            if (account) {
                 $('#myFormWrap').show();
                 $('#ksFormWrap').hide();
                 $('.login-wrap').show();
-                contract = new ethClient.AltExecCnsContract(userAccount, cnsAddress);
+                contract = new ethClient.AltExecCnsContract(account, cnsAddress);
                 getAllBooks();
             } else {
                 $('#myFormWrap').hide();
@@ -126,16 +127,15 @@
             $('.status').show();
             $('.warn').find('a').remove();
             $('.warn').hide();
+			password = $('#newPassword').val();
             ethClient.Account.create(baseUrl, password, function(err, _account) {
                 if (err) console.log(err);
                 else {
-                    account = _account;
-
                     $('.status').hide();
                     $('.warn').show();
-                    var encode = account.serialize();
+                    var encode = _account.serialize();
                     var element = document.createElement('a');
-                    var filename = "UTC--" + (new Date().toJSON().slice(0,10)) + '--' + stripHexPrefix(account.getAddress());
+                    var filename = "UTC--" + (new Date().toJSON().slice(0,10)) + '--' + stripHexPrefix(_account.getAddress());
                     element.setAttribute('href', 'data:text/json;charset=utf-8,' + encodeURIComponent(encode));
                     element.setAttribute('download', filename);
                     element.setAttribute('class', 'download');
@@ -151,6 +151,8 @@
             var fReader = new FileReader();
             fReader.readAsDataURL(input.files[0]);
             var reader = new FileReader();
+			
+			password = $('#yourPassword').val();
 
     		reader.onload = (function (theFile) {
     			return function (e) {
@@ -158,8 +160,17 @@
     					serializedAccount = e.target.result;
                         var _account = ethClient.Account.deserialize(serializedAccount);
                         account = _account;
-                        LOCAL_STORAGE.setAccount(_account);
-                        window.location.href = "/";
+						account.sign(password,	ethClient.utils.hash(password),
+							function(err, _sign) {
+								if (err) {
+									alert('Account is not exist. Need to create new account to login');
+									return false;
+								}
+								//LOCAL_STORAGE.setAccount(_account);
+								init();
+								//window.location.href = "/";
+							}
+						);
     				} catch (ex) {
     					alert('Sorry, keystore file is invalid');
     				}
@@ -429,6 +440,7 @@
 
         $('#btnCreateAccount').click(function(e) {
             e.preventDefault();
+			if (!$('#newPassword').val()) { alert('Input password'); return false; }
             if ($(this).hasClass('disabled')) return false;
             $(this).addClass('disabled');
             createNewAccount();
